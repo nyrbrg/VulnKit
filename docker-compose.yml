@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vulnkit
+      POSTGRES_PASSWORD: vulnkit
+      POSTGRES_DB: vulnkit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vulnkit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://vulnkit:vulnkit@postgres:5432/vulnkit?sslmode=disable
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  vulnkit-labs:
+    build: ./labs
+    ports:
+      - "8888:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
